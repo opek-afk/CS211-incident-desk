@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import sqlite3
 from threading import Lock, Timer
@@ -199,10 +200,14 @@ class DeskHandler(BaseHTTPRequestHandler):
     def _route(self):
         port = self.server.server_port
         hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
-        if self.headers.get("Host") not in hosts:
-            self._json(HTTPStatus.FORBIDDEN, {"error": "เปิดระบบผ่าน URL ที่แสดงใน Terminal"})
-            return None
-        return urlsplit(self.path)
+        public_host = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").lower()
+    if public_host:
+        hosts.add(public_host)
+        hosts.add(f"{public_host}:443")
+    if self.headers.get("Host") not in hosts:
+        self._json(HTTPStatus.FORBIDDEN, {"error": "เปิดระบบผ่าน URL ที่แสดงใน Terminal"})
+        return None
+    return urlsplit(self.path)
 
     def _board(self, route):
         mode = parse_qs(route.query).get("mode", ["live"])[0]
@@ -274,11 +279,12 @@ class DeskHandler(BaseHTTPRequestHandler):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--database", default=str(APP_DIR / "incident-desk.sqlite3"))
     parser.add_argument("--open", action="store_true", help="Open the browser on startup")
     options = parser.parse_args()
     try:
-        with DeskServer(("127.0.0.1", options.port), options.database) as server:
+        with DeskServer((options.host, options.port), options.database) as server:
             url = f"http://127.0.0.1:{server.server_port}"
             print(f"Incident Desk: {url}  (Ctrl+C to stop)", flush=True)
             if options.open:
