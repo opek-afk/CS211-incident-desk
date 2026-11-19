@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Incident Desk · ระบบคิวเหตุการณ์ไซเบอร์</title>
+<meta name="description" content="ระบบรับแจ้งและจัดลำดับเหตุการณ์ไซเบอร์สำหรับ CS211">
+<style>
+:root {
+  color-scheme: dark;
+  --canvas: #0b101a;
+  --sidebar: #101622;
+  --surface: #111a29;
+  --input: #0b1321;
+  --line: #253146;
+  --text: #f1f4ff;
+  --muted: #a3afc5;
+  --subtle: #7f90aa;
+  --indigo: #a7a5ff;
+  --primary: #c9c7ff;
+  --purple: #c3acff;
+  --cyan: #8cd8f4;
+  --green: #7ee3af;
+  --rose: #ff9fae;
+  --yellow: #ffcc86;
+  --radius: 17px;
+  font: 16px/1.5 "Noto Sans Thai", "Thonburi", "Leelawadee UI", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: var(--canvas); color: var(--text); }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: .47; }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+[hidden] { display: none !important; }
+h1, h2, h3, p { margin: 0; }
+.icon { width: 20px; height: 20px; flex: 0 0 auto; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.shell { min-height: 100vh; display: grid; grid-template-columns: 225px minmax(0, 1fr); }
+.sidebar {
+  position: sticky; top: 0; align-self: start; height: 100dvh; display: flex; flex-direction: column;
+  padding: 30px 17px 20px; border-right: 1px solid var(--line); background: var(--sidebar);
+}
+.brand { display: flex; align-items: center; gap: 12px; padding: 0 7px 0 8px; }
+.brand-mark {
+  display: grid; place-items: center; width: 43px; height: 43px; flex: 0 0 43px;
+  border: 1px solid #7777dc; border-radius: 13px; color: #e4e3ff;
+  background: linear-gradient(140deg, #4c4bab, #272955); box-shadow: 0 3px 18px #7775ef22;
+}
+.brand-mark .icon { width: 23px; height: 23px; }
+.brand strong { display: block; font-size: 1rem; letter-spacing: -.015em; }
+.brand span { display: block; color: var(--subtle); font-size: .75rem; }
+.menu { display: grid; gap: 7px; margin-top: 44px; }
+.nav-btn { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 45px; padding: 9px 12px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--muted); text-align: left; font-size: .9rem; font-weight: 600; }
+.nav-btn:hover { background: #1b2537; color: var(--text); }
+.nav-btn[aria-current="page"] { background: #242748; border-color: #393d6b; color: #d8d8ff; }
+.nav-btn[aria-current="page"] .icon { color: var(--indigo); }
+.sidebar-bottom { margin-top: auto; padding: 15px 8px 0; border-top: 1px solid var(--line); }
+.connection { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .8rem; }
+.connection::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--subtle); }
+.connection[data-status="online"]::before { background: var(--green); }
+.connection[data-status="error"]::before { background: var(--rose); }
+.main { width: 100%; max-width: 1440px; margin: 0 auto; padding: 32px clamp(20px, 3.05vw, 50px) 35px; }
+.topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 23px; }
+.page-title { font-size: clamp(1.52rem, 2.5vw, 2.02rem); font-weight: 750; line-height: 1.22; letter-spacing: -.03em; }
+.page-description { margin-top: 6px; color: var(--muted); font-size: .9rem; }
+.top-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 9px; align-items: center; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 8px 14px; border-radius: 10px; border: 1px solid transparent; white-space: nowrap; font-size: .875rem; font-weight: 700; }
+.btn .icon { width: 17px; height: 17px; }
+.primary { background: var(--primary); color: #16172c; box-shadow: 0 3px 12px #8278ff25; }
+.primary:hover:enabled { background: #dedcff; }
+.secondary { border-color: #37445b; background: #141e2e; color: #dce3f4; }
+.secondary:hover:enabled { background: #202d45; border-color: #697b9b; }
+.secondary[aria-pressed="true"] { background: #2c2549; color: #e5d6ff; border-color: #664e9a; }
+.quiet { color: var(--muted); background: transparent; border-color: var(--line); }
+.quiet:hover:enabled { color: var(--text); background: #1b273a; }
+.notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 15px; padding: 9px 13px; border: 1px solid #725e45; border-radius: 10px; background: #27211e; color: #ffdfaf; font-size: .87rem; }
+.notice .btn { min-height: 34px; }
+.hero {
+  position: relative; isolation: isolate; overflow: hidden; display: flex; justify-content: space-between; align-items: end;
+  gap: 18px; min-height: 176px; padding: 23px 24px; border: 1px solid #454575; border-radius: var(--radius);
+  background: radial-gradient(ellipse at 94% 3%, #5b4cb475, transparent 65%), linear-gradient(107deg, #20294a 0%, #25224a 67%, #2d2552 100%);
+}
+.hero::before {
+  content: ""; position: absolute; z-index: -1; inset: 0 0 0 48%; pointer-events: none;
+  background-image: linear-gradient(#c6b8ff19 1px, transparent 1px), linear-gradient(90deg, #c6b8ff19 1px, transparent 1px);
+  background-size: 31px 31px; mask-image: linear-gradient(90deg, transparent, #000);
+}
+.hero::after { content: ""; position: absolute; z-index: -1; right: 9%; top: -95px; width: 255px; height: 255px; border-radius: 50%; border: 1px solid #d4c8ff22; box-shadow: 0 0 0 26px #c5b7ff0b, 0 0 0 53px #c5b7ff0b; pointer-events: none; }
+.hero-label { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; color: #d2d1fa; font-size: .82rem; font-weight: 700; }
+.hero-label .icon { width: 17px; height: 17px; color: #b8b5ff; }
+.hero-title { font-size: clamp(1.24rem, 2.1vw, 1.77rem); font-weight: 750; line-height: 1.33; overflow-wrap: anywhere; }
+.hero-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 11px; min-height: 24px; margin-top: 9px; color: #d2d2e8; font-size: .85rem; }
+.hero-action { margin: 0 0 1px auto; flex: none; }
+.hero-action.secondary { border-color: #7772a7; background: #25264b; }
+.hero-action.secondary:hover:enabled { background: #3c3671; }
+.counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 15px 0 23px; }
+.stat { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 15px 13px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+.stat-icon, .card-icon {
+  display: grid; flex: 0 0 38px; width: 38px; height: 38px; place-items: center;
+  border-radius: 10px; border: 1px solid #46436c; background: #28284d; color: var(--purple);
+}
+.stat-icon.urgent { color: var(--rose); background: #392438; border-color: #57384b; }
+.stat-icon.normal { color: var(--cyan); background: #193145; border-color: #2a4a62; }
+.stat-icon.done { color: var(--green); background: #17352d; border-color: #2b5346; }
+.stat-label { display: block; color: var(--muted); font-size: .79rem; }
+.stat strong { display: block; margin-top: 1px; font: 650 1.42rem/1.15 system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 18px 12px; }
+.panel-head h2 { font-size: 1.08rem; }
+.filters { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; padding: 0 18px 13px; }
+.segment { display: flex; gap: 3px; align-items: stretch; padding: 3px; background: var(--input); border: 1px solid var(--line); border-radius: 9px; }
+.filter { padding: 5px 10px; border: 1px solid transparent; border-radius: 6px; color: var(--muted); background: transparent; white-space: nowrap; font-size: .78rem; font-weight: 650; }
+.filter:hover { color: var(--text); }
+.filter[aria-pressed="true"] { border-color: #3e486f; color: #dedfff; background: #252d4a; }
+.search { display: flex; align-items: center; gap: 7px; padding: 0 9px; background: var(--input); border: 1px solid var(--line); border-radius: 9px; color: var(--subtle); }
+.search:focus-within { border-color: var(--cyan); }
+.search .icon { width: 15px; height: 15px; }
+.search input { min-width: 0; width: 146px; height: 33px; padding: 0; border: 0; outline: none; background: transparent; color: var(--text); font-size: .83rem; }
+.search input::placeholder { color: var(--subtle); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; text-align: left; table-layout: fixed; }
+th { padding: 9px 12px; border-block: 1px solid var(--line); background: #151f30; color: #a8b5cc; font-size: .76rem; font-weight: 650; white-space: nowrap; }
+td { padding: 11px 12px; border-bottom: 1px solid #222e41; color: #e9effd; font-size: .875rem; overflow-wrap: anywhere; }
+th:first-child, td:first-child { width: 106px; padding-left: 18px; }
+th:nth-child(3) { width: 83px; }
+th:nth-child(4) { width: 80px; }
+th:last-child, td:last-child { width: 146px; padding-right: 18px; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: #19243a; }
+.mono { font: 600 .8rem ui-monospace, "SF Mono", Menlo, monospace; color: #b9c5df; white-space: nowrap; }
+.when { color: var(--muted); font-size: .8rem; white-space: nowrap; }
+.badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 6px; border: 1px solid #4a526e; background: #252e45; color: #d3dcf5; font-size: .75rem; font-weight: 700; white-space: nowrap; }
+.badge.urgent { color: var(--rose); border-color: #704453; background: #482b40; }
+.badge.normal { color: var(--cyan); border-color: #34617a; background: #1b3850; }
+.badge.p1 { color: var(--rose); border-color: #704453; background: #482b40; }
+.badge.p2 { color: var(--yellow); border-color: #70513d; background: #42302e; }
+.empty { display: grid; justify-items: center; gap: 7px; padding: 26px 16px 30px; text-align: center; border-top: 1px solid var(--line); }
+.empty-icon { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid #384765; border-radius: 11px; color: var(--indigo); background: #1d2942; margin-bottom: 3px; }
+.empty p { color: var(--muted); font-size: .83rem; }
+.pagination { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding: 10px 18px; color: var(--muted); font-size: .8rem; }
+.page-actions { display: flex; gap: 6px; }
+.page-actions .btn { min-height: 32px; padding: 4px 9px; font-size: .77rem; }
+.design-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0; }
+.design-card { padding: 20px; }
+.design-card h2 { margin-top: 12px; font-size: 1.16rem; }
+.design-card p { margin-top: 7px; color: var(--muted); font-size: .9rem; }
+.operations { margin: 14px 0 0; padding: 0; }
+.operations div { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: .86rem; }
+.operations dd { margin: 0; }
+code { display: inline-block; padding: 2px 6px; border: 1px solid #434c72; border-radius: 6px; background: #22294a; color: #d4d8ff; font: .8rem ui-monospace, "SF Mono", Menlo, monospace; white-space: nowrap; }
+.flow { padding: 17px 20px; }
+.flow h2 { margin-bottom: 6px; font-size: 1.05rem; }
+.flow p { color: var(--muted); font-size: .9rem; }
+.flow p + p { margin-top: 6px; }
+dialog { width: min(480px, calc(100% - 28px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #415275; border-radius: 18px; color: var(--text); background: #141d2e; box-shadow: 0 24px 84px #000a; }
+dialog::backdrop { background: #040810b8; backdrop-filter: blur(4px); }
+.dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+.dialog-head h2 { font-size: 1.24rem; }
+.icon-btn { display: grid; place-items: center; width: 35px; height: 35px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: transparent; }
+.icon-btn:hover { color: var(--text); background: #233251; }
+.incident-form { padding: 20px; }
+.field { display: grid; gap: 6px; margin-bottom: 15px; }
+.field > label, legend { font-size: .9rem; font-weight: 700; }
+textarea, select { border: 1px solid #3b4963; border-radius: 9px; color: var(--text); background: var(--input); }
+textarea { width: 100%; min-height: 94px; padding: 9px 11px; resize: vertical; }
+textarea::placeholder { color: var(--subtle); }
+.field-note { color: var(--muted); font-size: .8rem; }
+fieldset { min-width: 0; padding: 0; border: 0; margin: 0 0 15px; }
+legend { margin-bottom: 6px; padding: 0; }
+.picks { display: flex; gap: 8px; }
+.pick { position: relative; flex: 1; }
+.pick input { position: absolute; opacity: 0; }
+.pick span { display: flex; align-items: center; gap: 7px; min-height: 41px; padding: 8px 10px; border-radius: 9px; border: 1px solid #3b4963; color: var(--muted); background: var(--input); cursor: pointer; }
+.pick input:checked + span { color: #e0ddff; border-color: #7779c7; background: #2b2d53; }
+.pick input:focus-visible + span { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.select { appearance: none; padding: 7px 33px 7px 10px; min-height: 40px; width: 100%; }
+.select-wrap { position: relative; }
+.select-wrap .icon { position: absolute; right: 9px; top: 10px; pointer-events: none; color: var(--muted); }
+.form-error { color: var(--rose); font-size: .875rem; margin-bottom: 12px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 11px; border-top: 1px solid var(--line); }
+.toast { position: fixed; right: 22px; bottom: 20px; z-index: 2; max-width: min(420px, calc(100% - 32px)); padding: 10px 13px; border: 1px solid #427b67; border-radius: 10px; background: #16372e; color: #d4f8e4; font-size: .9rem; box-shadow: 0 7px 28px #0007; }
+.toast[data-kind="error"] { color: #ffdbe2; background: #49273a; border-color: #8b4d66; }
+@media (max-width: 960px) {
+  .shell { grid-template-columns: 176px minmax(0, 1fr); }
+  .sidebar { padding-inline: 10px; }
+  .brand { gap: 8px; }
+  .brand-mark { width: 36px; height: 36px; flex-basis: 36px; }
+  .main { padding-inline: 19px; }
+  .stat { gap: 8px; padding: 12px 9px; }
+  .stat-icon { width: 31px; height: 31px; flex-basis: 31px; }
+  .stat-icon .icon { width: 17px; height: 17px; }
+  .topbar { flex-wrap: wrap; }
+}
+@media (max-width: 700px) {
+  .shell { display: block; }
+  .sidebar { z-index: 1; height: auto; padding: 10px 12px 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  .brand span, .sidebar-bottom { display: none; }
+  .brand { padding-left: 4px; }
+  .brand-mark { width: 31px; height: 31px; flex-basis: 31px; border-radius: 9px; }
+  .brand-mark .icon { width: 18px; height: 18px; }
+  .menu { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-top: 8px; padding-bottom: 8px; }
+  .nav-btn { min-height: 36px; padding: 6px 5px; justify-content: center; gap: 4px; font-size: .76rem; white-space: nowrap; }
+  .nav-btn .icon { width: 15px; height: 15px; }
+  .main { padding: 19px 12px 24px; }
+  .topbar { align-items: flex-start; margin-bottom: 13px; row-gap: 11px; }
+  .top-actions { justify-content: flex-start; }
+  .page-description { font-size: .83rem; }
+  .btn { min-height: 39px; }
+  .hero { align-items: start; flex-direction: column; justify-content: center; gap: 13px; min-height: 150px; padding: 16px; }
+  .hero-action { margin: 0; }
+  .counts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 9px 0 15px; }
+  .stat-label { font-size: .76rem; }
+  .design-grid { grid-template-columns: 1fr; }
+  .panel-head { padding: 13px 11px 10px; }
+  .filters { padding: 0 11px 10px; }
+  .search input { width: min(146px, 36vw); }
+  th:first-child, td:first-child { width: 73px; padding-left: 11px; }
+  th:nth-child(3) { width: 64px; }
+  th:nth-child(4) { width: 60px; }
+  th:last-child, td:last-child { width: 112px; padding-right: 11px; }
+  table { min-width: 475px; }
+  #history-table { min-width: 456px; }
+  th, td { padding-inline: 7px; }
+}
+@media (max-width: 560px) {
+  table, #history-table, tbody { display: block; min-width: 0; }
+  thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  tbody tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center; gap: 4px 7px; padding: 10px 12px; border-bottom: 1px solid var(--line);
+  }
+  tbody tr:first-child { border-top: 1px solid var(--line); }
+  tbody tr:last-child { border-bottom: 0; }
+  tbody td, tbody td:first-child, tbody td:last-child { width: auto; padding: 0; border: 0; }
+  tbody td:nth-child(2) { grid-area: 2 / 1 / auto / -1; }
+  tbody td:last-child { grid-area: 3 / 1 / auto / -1; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  button { transition: background-color .15s, border-color .15s, color .15s; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <defs>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-dash" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 1 2.6 6.4M3 12V6m0 6h6m3-4v4l2.5 2.5"/></symbol>
+    <symbol id="i-branch" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M12 8v4m-7 4v-4h14v4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v7l-5 8a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-8V3M8 15h8"/></symbol>
+    <symbol id="i-activity" viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M4 13 7 5h10l3 8v6H4zm0 0h4l2 3h4l2-3h4"/></symbol>
+    <symbol id="i-urgent" viewBox="0 0 24 24"><path d="m13 2-9 12h7l-1 8 10-12h-7z"/></symbol>
+    <symbol id="i-queue" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  </defs>
+</svg>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg></div>
+      <div><strong>Incident Desk</strong><span>CS211 · Data Structures</span></div>
+    </div>
+    <nav class="menu" aria-label="เมนูหลัก">
+      <button class="nav-btn" type="button" data-view="dashboard" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#i-dash"/></svg>ภาพรวม</button>
+      <button class="nav-btn" type="button" data-view="history"><svg class="icon" aria-hidden="true"><use href="#i-history"/></svg>ประวัติการตรวจ</button>
+      <button class="nav-btn" type="button" data-view="structures"><svg class="icon" aria-hidden="true"><use href="#i-branch"/></svg>โครงสร้างข้อมูล</button>
+    </nav>
+    <div class="sidebar-bottom"><span class="connection" id="connection" data-status="loading">กำลังเชื่อมต่อ</span></div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1 class="page-title" id="page-title">ศูนย์จัดการเหตุการณ์ไซเบอร์</h1>
+        <p class="page-description" id="page-description">รับแจ้งเหตุ จัดลำดับคิว และติดตามรายการที่ตรวจแล้ว</p>
+      </div>
+      <div class="top-actions">
+        <button class="btn secondary" type="button" id="demo" aria-pressed="false" disabled><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg><span id="demo-label">โหมดสาธิต</span></button>
+        <button class="btn primary" type="button" id="add" disabled><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>เพิ่มเหตุการณ์</button>
+      </div>
+    </header>
+    <div class="notice" id="demo-notice" hidden>
+      <span>กำลังใช้ข้อมูลตัวอย่าง รายการสาธิตจะเริ่มใหม่เมื่อปิดและเปิดระบบอีกครั้ง</span>
+      <button type="button" class="btn quiet" id="exit-demo">กลับไปข้อมูลจริง</button>
+    </div>
+    <div class="notice" id="error-notice" role="alert" hidden>
+      <span id="error-message"></span><button type="button" class="btn quiet" id="retry">ลองใหม่</button>
+    </div>
+    <section id="dashboard" aria-labelledby="page-title">
+      <section class="hero" aria-labelledby="next-title">
+        <div>
+          <p class="hero-label"><svg class="icon" aria-hidden="true"><use href="#i-activity"/></svg>คิวถัดไป</p>
+          <h2 class="hero-title" id="next-title">กำลังโหลดคิว</h2>
+          <div class="hero-meta" id="next-meta"></div>
+        </div>
+        <button class="btn primary hero-action" type="button" id="process" hidden><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>บันทึกว่าตรวจแล้ว</button>
+        <button class="btn secondary hero-action" type="button" id="try-demo" hidden><svg class="icon" aria-hidden="true"><use href="#i-flask"/></svg>ลองข้อมูลตัวอย่าง</button>
+      </section>
+      <div class="counts" aria-label="สรุปจำนวนเหตุการณ์">
+        <div class="stat"><span class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-inbox"/></svg></span><div><span class="stat-label">รอตรวจทั้งหมด</span><strong id="total-count">–</strong></div></div>
+        <div class="stat"><span class="stat-icon urgent"><svg class="icon" aria-hidden="true"><use href="#i-urgent"/></svg></span><div><span class="stat-label">ด่วนรอตรวจ</span><strong id="urgent-count">–</strong></div></div>
+        <div class="stat"><span class="stat-icon normal"><svg class="icon" aria-hidden="true"><use href="#i-queue"/></svg></span><div><span class="stat-label">ทั่วไปรอตรวจ</span><strong id="normal-count">–</strong></div></div>
+        <div class="stat"><span class="stat-icon done"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span><div><span class="stat-label">ตรวจแล้ว</span><strong id="done-count">–</strong></div></div>
+      </div>
+      <section class="panel" aria-labelledby="pending-heading">
+        <header class="panel-head"><h2 id="pending-heading">คิวรอตรวจ</h2></header>
+        <div class="filters">
+          <div class="segment" role="group" aria-label="กรองประเภทคิว">
+            <button class="filter" type="button" data-filter="all" aria-pressed="true">ทั้งหมด</button>
+            <button class="filter" type="button" data-filter="urgent" aria-pressed="false">ด่วน</button>
+            <button class="filter" type="button" data-filter="normal" aria-pressed="false">ทั่วไป</button>
+          </div>
+          <label class="search"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span class="sr-only">ค้นหาในคิวรอตรวจ</span><input id="pending-search" type="search" placeholder="ค้นหาเหตุการณ์"></label>
+        </div>
+        <div class="table-wrap" id="pending-wrap" hidden>
+          <table role="table" aria-labelledby="pending-heading">
+            <thead role="rowgroup"><tr role="row"><th scope="col">รหัส</th><th scope="col">เหตุการณ์</th><th scope="col">ประเภท</th><th scope="col">ระดับด่วน</th><th scope="col">เวลาแจ้ง</th></tr></thead>
+            <tbody role="rowgroup" id="pending-rows"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="pending-empty" hidden>
+          <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-inbox"/></svg></span>
+          <strong id="pending-empty-title">ยังไม่มีเหตุการณ์รอตรวจ</strong><p id="pending-empty-detail">กดเพิ่มเหตุการณ์เพื่อเริ่มจัดคิว</p>
+        </div>
+        <div class="pagination" id="pending-pagination" hidden>
+          <span id="pending-result"></span>
+          <div class="page-actions"><button class="btn quiet" type="button" id="pending-prev">ก่อนหน้า</button><button class="btn quiet" type="button" id="pending-next">ถัดไป</button></div>
+        </div>
+      </section>
+    </section>
+    <section id="history" aria-labelledby="page-title" hidden>
+      <section class="panel" aria-labelledby="history-heading">
+        <header class="panel-head"><h2 id="history-heading">รายการที่ตรวจแล้ว</h2><span class="badge" id="history-total">ด่วน 0 · ทั่วไป 0</span></header>
+        <div class="filters">
+          <div class="segment" role="group" aria-label="กรองประเภทประวัติ">
+            <button class="filter" type="button" data-filter="all" aria-pressed="true">ทั้งหมด</button>
+            <button class="filter" type="button" data-filter="urgent" aria-pressed="false">ด่วน</button>
+            <button class="filter" type="button" data-filter="normal" aria-pressed="false">ทั่วไป</button>
+          </div>
+          <label class="search"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span class="sr-only">ค้นหาประวัติการตรวจ</span><input id="history-search" type="search" placeholder="ค้นหาเหตุการณ์"></label>
+        </div>
+        <div class="table-wrap" id="history-wrap" hidden>
+          <table role="table" id="history-table" aria-labelledby="history-heading">
+            <thead role="rowgroup"><tr role="row"><th scope="col">รหัส</th><th scope="col">เหตุการณ์</th><th scope="col">ประเภท</th><th scope="col">ระดับด่วน</th><th scope="col">เวลาที่ตรวจ</th></tr></thead>
+            <tbody role="rowgroup" id="history-rows"></tbody>
+          </table>
+        </div>
+        <div class="empty" id="history-empty" hidden>
+          <span class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-history"/></svg></span><strong id="history-empty-title">ยังไม่มีประวัติการตรวจ</strong><p id="history-empty-detail">รายการจะปรากฏเมื่อบันทึกว่าตรวจแล้ว</p>
+        </div>
+        <div class="pagination" id="history-pagination" hidden>
+          <span id="history-result"></span>
+          <div class="page-actions"><button class="btn quiet" type="button" id="history-prev">ก่อนหน้า</button><button class="btn quiet" type="button" id="history-next">ถัดไป</button></div>
+        </div>
+      </section>
+    </section>
+    <section id="structures" aria-labelledby="page-title" hidden>
+      <div class="design-grid">
+        <article class="panel design-card">
+          <span class="card-icon"><svg class="icon" aria-hidden="true"><use href="#i-queue"/></svg></span>
+          <h2>Queue · คิวทั่วไป</h2>
+          <p>ใช้ Linked List ที่เก็บทั้งหัวและท้ายคิว เพิ่มเหตุที่ท้ายและนำออกจากหัวตามลำดับมาก่อนออกก่อน (FIFO) อาร์เรย์ที่นำสมาชิกตัวแรกออกด้วยการเลื่อนสมาชิกจะใช้ <code>O(n)</code> ต่อครั้ง</p>
+          <dl class="operations">
+            <div><dt>เพิ่มท้ายคิว · enqueue</dt><dd><code>O(1)</code></dd></div>
+            <div><dt>นำหัวคิวออก · dequeue</dt><dd><code>O(1)</code></dd></div>
+            <div><dt>ดูหัวคิว · peek</dt><dd><code>O(1)</code></dd></div>
+            <div><dt>แสดงรายการทั้งหมด</dt><dd><code>O(n)</code></dd></div>
+          </dl>
+        </article>
+        <article class="panel design-card">
+          <span class="card-icon"><svg class="icon" aria-hidden="true"><use href="#i-branch"/></svg></span>
+          <h2>Min-Heap · คิวด่วน</h2>
+          <p>ให้เหตุระดับ 1 อยู่ก่อนระดับ 2–5 ระดับเท่ากันใช้ลำดับที่แจ้งเข้ามาตัดสิน คิว FIFO เดียวจะหยิบรายการแรกได้ <code>O(1)</code> แต่ถ้าจะหาความด่วนสูงสุดต้องไล่ดูถึง <code>O(n)</code></p>
+          <dl class="operations">
+            <div><dt>เพิ่มเข้าคิวด่วน · insert</dt><dd><code>O(log n)</code></dd></div>
+            <div><dt>นำเหตุที่ด่วนที่สุดออก · extract_min</dt><dd><code>O(log n)</code></dd></div>
+            <div><dt>ดูเหตุที่ด่วนที่สุด · peek</dt><dd><code>O(1)</code></dd></div>
+            <div><dt>แสดงรายการตามลำดับ</dt><dd><code>O(n log n)</code></dd></div>
+          </dl>
+        </article>
+      </div>
+      <article class="panel flow">
+        <h2>ลำดับที่ระบบเลือกตรวจ</h2>
+        <p>ระบบเลือกเหตุจาก Min-Heap ก่อน หากคิวด่วนว่างจึงเลือกหัว Queue ส่วนการแสดงคิวด่วนทั้งหมดใช้สำเนา Heap เพื่อรักษาคิวจริงไว้</p>
+        <p>Big-O ข้างต้นวัดเฉพาะการทำงานของโครงสร้างข้อมูล โดย <code>n</code> คือจำนวนรายการในคิวนั้น ส่วนการบันทึกไฟล์และแสดงผลหน้าเว็บมีต้นทุนแยกต่างหาก</p>
+      </article>
+    </section>
+  </main>
+</div>
+<dialog id="add-dialog" aria-labelledby="dialog-heading">
+  <form class="incident-form" id="incident-form">
+    <header class="dialog-head">
+      <h2 id="dialog-heading">เพิ่มเหตุการณ์</h2>
+      <button class="icon-btn" type="button" id="close-dialog" aria-label="ปิด"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </header>
+    <div class="field">
+      <label for="description">รายละเอียดเหตุการณ์</label>
+      <textarea id="description" name="description" required maxlength="240" rows="3" placeholder="เช่น พบการเข้าสู่ระบบผิดปกติ" autofocus></textarea>
+    </div>
+    <fieldset>
+      <legend>ประเภท</legend>
+      <div class="picks">
+        <label class="pick"><input name="type" type="radio" value="normal" checked><span><svg class="icon" aria-hidden="true"><use href="#i-queue"/></svg>ทั่วไป</span></label>
+        <label class="pick"><input name="type" type="radio" value="urgent"><span><svg class="icon" aria-hidden="true"><use href="#i-urgent"/></svg>ด่วน</span></label>
+      </div>
+    </fieldset>
+    <div class="field" id="priority-field" hidden>
+      <label for="priority">ระดับความด่วน</label>
+      <div class="select-wrap">
+        <select class="select" id="priority" name="priority" disabled>
+          <option value="">เลือกระดับ 1–5</option>
+          <option value="1">1 · ด่วนที่สุด</option>
+          <option value="2">2 · ด่วนมาก</option>
+          <option value="3">3 · ด่วน</option>
+          <option value="4">4 · เร่งติดตาม</option>
+          <option value="5">5 · เฝ้าระวัง</option>
+        </select>
+        <svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg>
+      </div>
+    </div>
+    <p class="form-error" id="form-error" role="alert" hidden></p>
+    <div class="dialog-actions">
+      <button class="btn quiet" type="button" id="cancel-dialog">ยกเลิก</button>
+      <button class="btn primary" type="submit" id="save">บันทึกเข้าคิว</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+<noscript>เปิด JavaScript ในเบราว์เซอร์เพื่อใช้งาน Incident Desk</noscript>
+<script>
+"use strict";
+
+const byId = id => document.getElementById(id);
+const navButtons = [...document.querySelectorAll("[data-view]")];
+const form = byId("incident-form");
+const dialog = byId("add-dialog");
+const pageSize = 8;
+const tables = {
+  pending: { key: "pending", section: byId("dashboard"), filter: "all", page: 0 },
+  history: { key: "history", section: byId("history"), filter: "all", page: 0 },
+};
+const titles = {
+  dashboard: ["ศูนย์จัดการเหตุการณ์ไซเบอร์", "รับแจ้งเหตุ จัดลำดับคิว และติดตามรายการที่ตรวจแล้ว"],
+  history: ["ประวัติการตรวจ", "ดูเหตุการณ์ที่ตรวจแล้ว เรียงจากรายการล่าสุด"],
+  structures: ["โครงสร้างข้อมูล", "เหตุผลที่ระบบเลือกใช้ Queue และ Min-Heap"],
+};
+const dateFormat = new Intl.DateTimeFormat("th-TH", {
+  day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
+let mode = "live";
+let state = null;
+let busy = false;
+let toastTimer;
+
+function span(text, className) {
+  const element = document.createElement("span");
+  element.textContent = text;
+  element.className = className;
+  return element;
+}
+
+function typeBadge(incident) {
+  const label = incident.type === "urgent" ? "ด่วน" : "ทั่วไป";
+  return span(label, "badge " + incident.type);
+}
+
+function priorityBadge(incident) {
+  return incident.priority === null
+    ? span("—", "when")
+    : span("P" + incident.priority, "badge p" + incident.priority);
+}
+
+function showToast(message, kind = "success") {
+  const toast = byId("toast");
+  clearTimeout(toastTimer);
+  toast.dataset.kind = kind;
+  toast.hidden = false;
+  toast.textContent = message;
+  toastTimer = setTimeout(() => { toast.hidden = true; }, 3800);
+}
+
+function showConnectionError(message, canRetry = true) {
+  byId("connection").textContent = "เชื่อมต่อไม่ได้";
+  byId("connection").dataset.status = "error";
+  byId("error-message").textContent = message;
+  byId("retry").hidden = !canRetry;
+  byId("error-notice").hidden = false;
+}
+
+function render() {
+  byId("demo").disabled = busy || !state;
+  byId("exit-demo").disabled = busy;
+  byId("try-demo").disabled = busy;
+  byId("add").disabled = busy || !state;
+  byId("process").disabled = busy || !state?.next;
+  byId("demo").setAttribute("aria-pressed", String(mode === "demo"));
+  byId("demo-label").textContent = mode === "demo" ? "กำลังสาธิต" : "โหมดสาธิต";
+  byId("demo-notice").hidden = mode !== "demo";
+
+  if (!state) {
+    byId("next-title").textContent = byId("error-notice").hidden ? "กำลังโหลดคิว" : "ระบบยังไม่พร้อม";
+    return;
+  }
+
+  const counts = state.counts;
+  byId("total-count").textContent = counts.urgent + counts.normal;
+  byId("urgent-count").textContent = counts.urgent;
+  byId("normal-count").textContent = counts.normal;
+  byId("done-count").textContent = counts.urgent_done + counts.normal_done;
+  byId("history-total").textContent = "ด่วน " + counts.urgent_done + " · ทั่วไป " + counts.normal_done;
+
+  const incident = state.next;
+  byId("next-title").textContent = incident ? incident.description : "ไม่มีเหตุการณ์รอตรวจ";
+  byId("next-meta").replaceChildren();
+  if (incident) {
+    byId("next-meta").append(span(incident.id, "mono"), typeBadge(incident));
+    if (incident.priority !== null) byId("next-meta").append(priorityBadge(incident));
+  } else {
+    byId("next-meta").textContent = "เพิ่มเหตุการณ์เพื่อเริ่มจัดคิว";
+  }
+  byId("process").hidden = !incident;
+  byId("try-demo").hidden = !!incident || mode === "demo";
+  renderTable(tables.pending);
+  renderTable(tables.history);
+}
+
+function renderTable(table) {
+  const { key, filter } = table;
+  const query = byId(key + "-search").value.trim().toLocaleLowerCase("th");
+  const records = state?.[key] ?? [];
+  const matching = records.filter(incident => {
+    const matchesType = filter === "all" || incident.type === filter;
+    const matchesQuery = (incident.id + " " + incident.description).toLocaleLowerCase("th").includes(query);
+    return matchesType && matchesQuery;
+  });
+  const pages = Math.max(1, Math.ceil(matching.length / pageSize));
+  table.page = Math.min(table.page, pages - 1);
+  const start = table.page * pageSize;
+  const page = matching.slice(start, start + pageSize);
+  const rows = document.createDocumentFragment();
+  for (const incident of page) {
+    const row = document.createElement("tr");
+    row.setAttribute("role", "row");
+    row.insertCell().append(span(incident.id, "mono"));
+    row.insertCell().textContent = incident.description;
+    row.insertCell().append(typeBadge(incident));
+    row.insertCell().append(priorityBadge(incident));
+    const date = new Date(key === "history" ? incident.processed_at : incident.created_at);
+    row.insertCell().append(span(dateFormat.format(date), "when"));
+    for (const cell of row.cells) cell.setAttribute("role", "cell");
+    rows.append(row);
+  }
+
+  byId(key + "-rows").replaceChildren(rows);
+  byId(key + "-wrap").hidden = !page.length;
+  byId(key + "-empty").hidden = !state || !!page.length;
+  const isFiltered = filter !== "all" || !!query;
+  const emptyTitle = key === "history" ? "ยังไม่มีประวัติการตรวจ" : "ยังไม่มีเหตุการณ์รอตรวจ";
+  byId(key + "-empty-title").textContent = isFiltered ? "ไม่พบเหตุการณ์ที่ตรงกัน" : emptyTitle;
+  const emptyDetail = key === "history" ? "รายการจะปรากฏเมื่อบันทึกว่าตรวจแล้ว" : "กดเพิ่มเหตุการณ์เพื่อเริ่มจัดคิว";
+  byId(key + "-empty-detail").textContent = isFiltered ? "ลองเปลี่ยนคำค้นหรือตัวกรอง" : emptyDetail;
+  byId(key + "-pagination").hidden = pages <= 1;
+  byId(key + "-result").textContent = (start + 1) + "–" + (start + page.length) + " จาก " + matching.length + " รายการ";
+  byId(key + "-prev").disabled = table.page === 0;
+  byId(key + "-next").disabled = table.page >= pages - 1;
+}
+
+function switchView(view) {
+  const [title, subtitle] = titles[view];
+  byId("page-title").textContent = title;
+  byId("page-description").textContent = subtitle;
+  for (const button of navButtons) {
+    const selected = button.dataset.view === view;
+    byId(button.dataset.view).hidden = !selected;
+    if (selected) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  }
+  window.scrollTo(0, 0);
+}
+
+async function request(path, { activeMode = mode, payload } = {}) {
+  const options = { signal: AbortSignal.timeout(10000) };
+  if (payload !== undefined) {
+    options.method = "POST";
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(payload);
+  }
+
+  let response;
+  let data;
+  try {
+    response = await fetch(path + "?mode=" + activeMode, options);
+    data = await response.json();
+  } catch {
+    throw new Error("ติดต่อระบบไม่ได้ ตรวจสอบว่า Terminal ยังเปิดระบบอยู่");
+  }
+  if (!response.ok) {
+    const failure = new Error(data.error ?? "คำสั่งไม่สำเร็จ");
+    failure.updatedState = data.state;
+    throw failure;
+  }
+  return data;
+}
+
+function syncPriority() {
+  const urgent = form.elements.type.value === "urgent";
+  const field = byId("priority");
+  byId("priority-field").hidden = !urgent;
+  field.disabled = !urgent;
+  field.required = urgent;
+}
+
+function resetTables() {
+  for (const table of Object.values(tables)) {
+    table.page = 0;
+    table.filter = "all";
+    byId(table.key + "-search").value = "";
+    for (const filter of table.section.querySelectorAll("[data-filter]")) {
+      filter.setAttribute("aria-pressed", String(filter.dataset.filter === "all"));
+    }
+  }
+}
+
+async function refresh(targetMode = mode) {
+  if (busy) return;
+  if (window.location.protocol === "file:") {
+    showConnectionError("เปิดระบบจาก Terminal ด้วยคำสั่ง python3 web_app.py --open", false);
+    render();
+    return;
+  }
+
+  busy = true;
+  render();
+  try {
+    const nextState = await request("/api/state", { activeMode: targetMode });
+    if (mode !== targetMode) resetTables();
+    mode = targetMode;
+    state = nextState;
+    byId("connection").textContent = mode === "demo" ? "พร้อมสาธิต" : "พร้อมใช้งานบนเครื่องนี้";
+    byId("connection").dataset.status = "online";
+    byId("error-notice").hidden = true;
+  } catch (error) {
+    showConnectionError(error.message);
+  } finally {
+    busy = false;
+    render();
+  }
+}
+
+for (const button of navButtons) {
+  button.addEventListener("click", () => switchView(button.dataset.view));
+}
+for (const table of Object.values(tables)) {
+  for (const filter of table.section.querySelectorAll("[data-filter]")) {
+    filter.addEventListener("click", () => {
+      table.filter = filter.dataset.filter;
+      table.page = 0;
+      for (const button of table.section.querySelectorAll("[data-filter]")) {
+        button.setAttribute("aria-pressed", String(button === filter));
+      }
+      renderTable(table);
+    });
+  }
+
+  byId(table.key + "-search").addEventListener("input", () => {
+    table.page = 0;
+    renderTable(table);
+  });
+  byId(table.key + "-prev").addEventListener("click", () => {
+    table.page -= 1;
+    renderTable(table);
+  });
+  byId(table.key + "-next").addEventListener("click", () => {
+    table.page += 1;
+    renderTable(table);
+  });
+}
+
+byId("demo").addEventListener("click", () => refresh(mode === "demo" ? "live" : "demo"));
+byId("try-demo").addEventListener("click", () => refresh("demo"));
+byId("exit-demo").addEventListener("click", () => refresh("live"));
+byId("retry").addEventListener("click", () => refresh());
+byId("add").addEventListener("click", () => {
+  form.reset();
+  byId("description").setCustomValidity("");
+  byId("form-error").hidden = true;
+  syncPriority();
+  dialog.showModal();
+});
+
+for (const id of ["close-dialog", "cancel-dialog"]) {
+  byId(id).addEventListener("click", () => dialog.close());
+}
+dialog.addEventListener("cancel", event => { if (busy) event.preventDefault(); });
+form.addEventListener("change", syncPriority);
+byId("description").addEventListener("input", event => event.target.setCustomValidity(""));
+
+form.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (busy) return;
+  const description = byId("description");
+  if (!description.value.trim()) {
+    description.setCustomValidity("กรุณากรอกรายละเอียดเหตุการณ์");
+    description.reportValidity();
+    return;
+  }
+
+  const type = form.elements.type.value;
+  const payload = { description: description.value.trim(), type, priority: type === "urgent" ? Number(byId("priority").value) : null };
+  busy = true;
+  for (const id of ["save", "close-dialog", "cancel-dialog"]) byId(id).disabled = true;
+  byId("form-error").hidden = true;
+  render();
+  let added = false;
+  try {
+    const result = await request("/api/incidents", { payload });
+    state = result.state;
+    added = true;
+    showToast("เพิ่ม " + result.incident.id + " เข้าคิวแล้ว");
+  } catch (error) {
+    byId("form-error").textContent = error.message;
+    byId("form-error").hidden = false;
+  } finally {
+    busy = false;
+    for (const id of ["save", "close-dialog", "cancel-dialog"]) byId(id).disabled = false;
+    render();
+    if (added) {
+      dialog.close();
+      byId("add").focus();
+    }
+  }
+});
+
+byId("process").addEventListener("click", async event => {
+  if (!state?.next || busy || event.detail > 1) return;
+  const id = state.next.id;
+  busy = true;
+  render();
+  try {
+    const result = await request("/api/process", { payload: { id } });
+    state = result.state;
+    showToast("บันทึกการตรวจ " + result.incident.id + " แล้ว");
+  } catch (error) {
+    if (error.updatedState) state = error.updatedState;
+    showToast(error.message, "error");
+  } finally {
+    busy = false;
+    render();
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && state && !dialog.open) refresh();
+});
+
+refresh();
+</script>
+</body>
+</html>
