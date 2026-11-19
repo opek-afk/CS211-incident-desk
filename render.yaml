@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: cs211-incident-desk
+    runtime: python
+    plan: free
+    buildCommand: "echo Ready"
+    startCommand: "python web_app.py --host 0.0.0.0"
+    healthCheckPath: /api/state
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
