@@ -197,17 +197,32 @@ class DeskHandler(BaseHTTPRequestHandler):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self._send(status, "application/json; charset=utf-8", body)
 
+   
     def _route(self):
         port = self.server.server_port
-        hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
-        public_host = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").lower()
-    if public_host:
-        hosts.add(public_host)
-        hosts.add(f"{public_host}:443")
-    if self.headers.get("Host") not in hosts:
-        self._json(HTTPStatus.FORBIDDEN, {"error": "เปิดระบบผ่าน URL ที่แสดงใน Terminal"})
-        return None
-    return urlsplit(self.path)
+        hosts = {
+            f"127.0.0.1:{port}",
+            f"localhost:{port}"
+        }
+
+        public_host = os.environ.get(
+            "RENDER_EXTERNAL_HOSTNAME", ""
+        ).lower()
+
+        if public_host:
+            hosts.add(public_host)
+            hosts.add(f"{public_host}:443")
+
+        if self.headers.get("Host") not in hosts:
+            self._json(
+                HTTPStatus.FORBIDDEN,
+                {"error": "ไม่อนุญาตให้เข้าถึงผ่าน URL นี้"}
+            )
+            return None
+
+        return urlsplit(self.path)
+
+
 
     def _board(self, route):
         mode = parse_qs(route.query).get("mode", ["live"])[0]
